@@ -105,14 +105,51 @@ npm install
 npm run dev
 ```
 
-## Building Native Android APK / EAS Build
-```bash
-# Generate native Android directory with notification listener plugin
-npx expo prebuild --platform android
+## Building Native Android APK
 
-# Or build standalone APK with EAS
-eas build --platform android --profile preview
-```
+### Option 1: EAS Cloud Build (Recommended — No Android Studio or SDK required)
+
+EAS Build compiles your application in an isolated cloud container with the exact Android SDK, NDK, and JDK 17 toolchain, producing a direct `.apk` download link & QR code you can install immediately on any Android device.
+
+1. **Log in to Expo / EAS** (Create a free account at [expo.dev](https://expo.dev) if you don't have one):
+   ```bash
+   eas login
+   ```
+
+2. **Trigger the standalone APK build**:
+   ```bash
+   npm run build:apk
+   # or directly:
+   eas build --platform android --profile preview
+   ```
+
+3. **Install on device**:
+   When the build finishes (usually 3-5 minutes), EAS will display a link and a terminal QR code. Open the link or scan the QR code with your Android phone to download and install `DhwaniPay.apk`.
+
+---
+
+### Option 2: Local Gradle Build (Requires Android Studio & JDK 17)
+
+If you prefer compiling locally on your machine:
+
+1. **Prerequisites**:
+   - Install **JDK 17** (ensure `JAVA_HOME` points to JDK 17).
+   - Install **Android Studio** with Android SDK Platform 35 and Build-Tools `35.0.0`.
+   - Set `ANDROID_HOME` in your environment (e.g., `%LOCALAPPDATA%\Android\Sdk`).
+
+2. **Generate the native project**:
+   ```bash
+   npm run prebuild
+   ```
+
+3. **Compile Release APK**:
+   ```bash
+   cd android
+   ./gradlew assembleRelease
+   ```
+   The compiled APK will be located at:
+   `android/app/build/outputs/apk/release/app-release.apk`
+
 
 ## Supabase Cloud Database & Email Authentication
 
