@@ -30,6 +30,12 @@
     "splash": {
       "backgroundColor": "#F7F9F6",
       "resizeMode": "contain"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6a8e786e-fe0b-48a0-97d9-88d83e992775"
+      }
     }
   }
 }
