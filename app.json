@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "DhwaniPay",
+    "slug": "dhwanipay",
+    "scheme": "dhwanipay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "./plugins/withNotificationListener.js"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "in.dhwanipay.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F9F6"
+      }
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.dhwanipay.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "splash": {
+      "backgroundColor": "#F7F9F6",
+      "resizeMode": "contain"
+    }
+  }
+}

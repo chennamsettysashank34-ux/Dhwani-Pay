@@ -1,0 +1,31 @@
+def safeExtGet(String prop, Integer fallback) {
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+group = 'in.dhwanipay.app.modules'
+version = '1.0.0'
+
+android {
+    namespace "in.dhwanipay.app.modules"
+    compileSdk safeExtGet("compileSdkVersion", 35)
+
+    defaultConfig {
+        minSdk safeExtGet("minSdkVersion", 24)
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    implementation project(':expo-modules-core')
+}
