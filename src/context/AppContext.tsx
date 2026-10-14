@@ -44,6 +44,37 @@ const LANG_STORAGE_KEY = 'dhwani_spoken_language_v2';
 const USER_STORAGE_KEY = 'dhwani_auth_user_v2';
 const USERS_DB_KEY = 'dhwani_registered_merchants_v2';
 
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        return window.localStorage.getItem(key);
+      }
+    } catch {
+      // Non-browser or security restricted
+    }
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.setItem(key, value);
+      }
+    } catch {
+      // Non-browser or storage quota exceeded
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.removeItem(key);
+      }
+    } catch {
+      // Non-browser or security restricted
+    }
+  },
+};
+
 type AppContextType = {
   events: PaymentEvent[];
   expenses: Expense[];
@@ -108,10 +139,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Purge legacy demo keys if present in browser
   useEffect(() => {
     try {
-      localStorage.removeItem('dhwani_web_payment_events_v1');
-      localStorage.removeItem('dhwani_web_expenses_v1');
-      localStorage.removeItem('dhwani_web_merchant_profile_v1');
-      localStorage.removeItem('dhwani_web_qr_vault_v1');
+      safeStorage.removeItem('dhwani_web_payment_events_v1');
+      safeStorage.removeItem('dhwani_web_expenses_v1');
+      safeStorage.removeItem('dhwani_web_merchant_profile_v1');
+      safeStorage.removeItem('dhwani_web_qr_vault_v1');
     } catch {
       // Ignore
     }
@@ -119,7 +150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
-      const saved = localStorage.getItem(USER_STORAGE_KEY);
+      const saved = safeStorage.getItem(USER_STORAGE_KEY);
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -128,7 +159,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [merchantProfile, setMerchantProfile] = useState<MerchantProfile>(() => {
     try {
-      const saved = localStorage.getItem(PROFILE_STORAGE_KEY);
+      const saved = safeStorage.getItem(PROFILE_STORAGE_KEY);
       return saved ? JSON.parse(saved) : defaultMerchantProfile;
     } catch {
       return defaultMerchantProfile;
@@ -137,7 +168,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [events, setEvents] = useState<PaymentEvent[]>(() => {
     try {
-      const saved = localStorage.getItem(EVENTS_STORAGE_KEY);
+      const saved = safeStorage.getItem(EVENTS_STORAGE_KEY);
       return saved ? JSON.parse(saved) : initialEvents;
     } catch {
       return initialEvents;
@@ -146,7 +177,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     try {
-      const saved = localStorage.getItem(EXPENSES_STORAGE_KEY);
+      const saved = safeStorage.getItem(EXPENSES_STORAGE_KEY);
       return saved ? JSON.parse(saved) : initialExpenses;
     } catch {
       return initialExpenses;
@@ -155,7 +186,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [vaultQRs, setVaultQRs] = useState<VaultQRCode[]>(() => {
     try {
-      const saved = localStorage.getItem(VAULT_STORAGE_KEY);
+      const saved = safeStorage.getItem(VAULT_STORAGE_KEY);
       return saved ? JSON.parse(saved) : INITIAL_VAULT_QRS;
     } catch {
       return INITIAL_VAULT_QRS;
@@ -163,7 +194,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [spokenLanguage, setSpokenLanguageState] = useState<string>(() => {
-    return localStorage.getItem(LANG_STORAGE_KEY) || 'Hindi';
+    return safeStorage.getItem(LANG_STORAGE_KEY) || 'Hindi';
   });
 
   const [themeMode, setThemeModeState] = useState<'light' | 'dark'>('light');
@@ -173,13 +204,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentSpeakingText, setCurrentSpeakingText] = useState<string>('');
   const [speechRate, setSpeechRate] = useState<number>(0.92);
 
-  // Sync to localStorage
+  // Sync to safeStorage
   useEffect(() => {
     try {
       if (currentUser) {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUser));
+        safeStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUser));
       } else {
-        localStorage.removeItem(USER_STORAGE_KEY);
+        safeStorage.removeItem(USER_STORAGE_KEY);
       }
     } catch (e) {
       console.warn('Storage save failed', e);
@@ -188,7 +219,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(merchantProfile));
+      safeStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(merchantProfile));
     } catch (e) {
       console.warn('Storage save failed', e);
     }
@@ -196,7 +227,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
+      safeStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
     } catch (e) {
       console.warn('Storage save failed', e);
     }
@@ -204,7 +235,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(expenses));
+      safeStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(expenses));
     } catch (e) {
       console.warn('Storage save failed', e);
     }
@@ -212,7 +243,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(vaultQRs));
+      safeStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(vaultQRs));
     } catch (e) {
       console.warn('Storage save failed', e);
     }
@@ -220,7 +251,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setSpokenLanguage = (lang: string) => {
     setSpokenLanguageState(lang);
-    localStorage.setItem(LANG_STORAGE_KEY, lang);
+    safeStorage.setItem(LANG_STORAGE_KEY, lang);
   };
 
   const setThemeMode = (mode: 'light' | 'dark') => {
@@ -242,7 +273,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Check existing accounts
-      const rawUsers = localStorage.getItem(USERS_DB_KEY);
+      const rawUsers = safeStorage.getItem(USERS_DB_KEY);
       const users: Record<string, { hash: string; id: string; createdAt: string }> = rawUsers
         ? JSON.parse(rawUsers)
         : {};
@@ -263,7 +294,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createdAt: newUser.createdAt,
       };
 
-      localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
+      safeStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
       setCurrentUser(newUser);
 
       // Reset profile state for new user
@@ -288,7 +319,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'Please provide both email and password.' };
       }
 
-      const rawUsers = localStorage.getItem(USERS_DB_KEY);
+      const rawUsers = safeStorage.getItem(USERS_DB_KEY);
       const users: Record<string, { hash: string; id: string; createdAt: string }> = rawUsers
         ? JSON.parse(rawUsers)
         : {};
@@ -317,7 +348,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logoutUser = async (): Promise<void> => {
     setCurrentUser(null);
-    localStorage.removeItem(USER_STORAGE_KEY);
+    safeStorage.removeItem(USER_STORAGE_KEY);
   };
 
   const completeOnboarding = (data: {
