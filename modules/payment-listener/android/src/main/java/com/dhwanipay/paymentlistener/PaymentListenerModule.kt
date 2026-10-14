@@ -49,38 +49,46 @@ class PaymentListenerModule : Module() {
         }
 
         OnCreate {
-            val ctx = appContext.reactContext ?: return@OnCreate
+            try {
+                val ctx = appContext.reactContext ?: return@OnCreate
 
-            receiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (intent?.action != "in.dhwanipay.app.PAYMENT_RECEIVED") return
+                receiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        try {
+                            if (intent?.action != "in.dhwanipay.app.PAYMENT_RECEIVED") return
 
-                    val amount = intent.getDoubleExtra("amount", 0.0)
-                    val source = intent.getStringExtra("source") ?: "UPI"
-                    val payer = intent.getStringExtra("payer") ?: ""
-                    val utr = intent.getStringExtra("utr") ?: ""
-                    val announcedNatively = intent.getBooleanExtra("announcedNatively", false)
+                            val amount = intent.getDoubleExtra("amount", 0.0)
+                            val source = intent.getStringExtra("source") ?: "UPI"
+                            val payer = intent.getStringExtra("payer") ?: ""
+                            val utr = intent.getStringExtra("utr") ?: ""
+                            val announcedNatively = intent.getBooleanExtra("announcedNatively", false)
 
-                    if (amount <= 0) return
+                            if (amount <= 0) return
 
-                    sendEvent(
-                        "onPaymentReceived", mapOf(
-                            "amount" to amount,
-                            "source" to source,
-                            "payer" to payer,
-                            "utr" to utr,
-                            "announcedNatively" to announcedNatively
-                        )
-                    )
+                            sendEvent(
+                                "onPaymentReceived", mapOf(
+                                    "amount" to amount,
+                                    "source" to source,
+                                    "payer" to payer,
+                                    "utr" to utr,
+                                    "announcedNatively" to announcedNatively
+                                )
+                            )
+                        } catch (t: Throwable) {
+                            android.util.Log.e("PaymentListenerModule", "Error handling received payment broadcast", t)
+                        }
+                    }
                 }
-            }
 
-            val filter = IntentFilter("in.dhwanipay.app.PAYMENT_RECEIVED")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ctx.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("UnspecifiedRegisterReceiverFlag")
-                ctx.registerReceiver(receiver, filter)
+                val filter = IntentFilter("in.dhwanipay.app.PAYMENT_RECEIVED")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ctx.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                } else {
+                    @Suppress("UnspecifiedRegisterReceiverFlag")
+                    ctx.registerReceiver(receiver, filter)
+                }
+            } catch (t: Throwable) {
+                android.util.Log.e("PaymentListenerModule", "Failed to register payment broadcast receiver in OnCreate", t)
             }
         }
 
@@ -88,7 +96,7 @@ class PaymentListenerModule : Module() {
             receiver?.let { r ->
                 try {
                     appContext.reactContext?.unregisterReceiver(r)
-                } catch (_: Exception) {
+                } catch (_: Throwable) {
                     // Already unregistered or context destroyed
                 }
             }

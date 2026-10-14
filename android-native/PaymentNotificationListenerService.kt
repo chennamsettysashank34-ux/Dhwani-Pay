@@ -362,10 +362,12 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
+            val safeIcon = if (applicationInfo.icon != 0) applicationInfo.icon else android.R.drawable.ic_dialog_info
+
             val notification = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("DhwaniPay Soundbox Active")
                 .setContentText("Listening for incoming PhonePe, Google Pay & Paytm payments")
-                .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
+                .setSmallIcon(safeIcon)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -376,8 +378,8 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Foreground notification start skipped or failed: ${e.message}")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Foreground notification start skipped or failed: ${t.message}")
         }
     }
 
