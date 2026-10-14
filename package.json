@@ -52,5 +52,13 @@
     "lucide-react-native": {
       "react": "$react"
     }
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript",
+        "@types/react-dom"
+      ]
+    }
   }
 }
