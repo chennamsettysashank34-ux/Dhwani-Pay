@@ -14,9 +14,8 @@ web-build/
 expo-env.d.ts
 # @end expo-cli
 
-# Android build cache
-android/build/
-android/app/build/
-android/.gradle/
+# Expo Continuous Native Generation (CNG)
+/android
+/ios
 powershell.cmd
 .aistudio/
