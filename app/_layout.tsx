@@ -1,5 +1,6 @@
+import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -26,35 +27,8 @@ function AppNavigator() {
     }
   }, [currentUser, authLoading, segments]);
 
-  if (authLoading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: colors.background,
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 16,
-        }}
-      >
-        <BrandMark size={64} />
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text
-          style={{
-            color: colors.muted,
-            fontSize: 13,
-            fontWeight: '700',
-            letterSpacing: 0.4,
-          }}
-        >
-          Securing DhwaniPay Soundbox...
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
@@ -88,7 +62,35 @@ function AppNavigator() {
         <Stack.Screen name="gateway-settings" />
         <Stack.Screen name="event/[id]" />
       </Stack>
-    </>
+
+      {authLoading && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: colors.background,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 16,
+              zIndex: 999,
+            },
+          ]}
+        >
+          <BrandMark size={64} />
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text
+            style={{
+              color: colors.muted,
+              fontSize: 13,
+              fontWeight: '700',
+              letterSpacing: 0.4,
+            }}
+          >
+            Securing DhwaniPay Soundbox...
+          </Text>
+        </View>
+      )}
+    </View>
   );
 }
 

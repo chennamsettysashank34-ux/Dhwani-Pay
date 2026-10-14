@@ -83,16 +83,20 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "DhwaniPay Notification Listener Service started")
-        tts = TextToSpeech(applicationContext, this)
+        try {
+            tts = TextToSpeech(applicationContext, this)
 
-        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-        wakeLock = powerManager?.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "DhwaniPay::PaymentAnnouncementWakeLock"
-        )
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = powerManager?.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "DhwaniPay::PaymentAnnouncementWakeLock"
+            )
 
-        createNotificationChannel()
-        startForegroundServiceNotification()
+            createNotificationChannel()
+            startForegroundServiceNotification()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing PaymentNotificationListenerService", e)
+        }
     }
 
     override fun onInit(status: Int) {
@@ -264,27 +268,31 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
     }
 
     private fun startForegroundServiceNotification() {
-        val notificationIntent = packageManager.getLaunchIntentForPackage(packageName)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        try {
+            val notificationIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                notificationIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("DhwaniPay Soundbox Active")
-            .setContentText("Listening for incoming PhonePe, Google Pay & Paytm payments")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("DhwaniPay Soundbox Active")
+                .setContentText("Listening for incoming PhonePe, Google Pay & Paytm payments")
+                .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Foreground notification start skipped or failed: ${e.message}")
         }
     }
 
