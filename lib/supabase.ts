@@ -278,7 +278,16 @@ export async function signUpWithEmail(
     }
   }
 
-  // Graceful local emulation when testing before entering live Supabase credentials
+  // In production builds, missing cloud credentials must fail safely
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      user: null,
+      session: null,
+      error: 'Cloud authentication service is not configured. Please ensure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are set.',
+    };
+  }
+
+  // Graceful local emulation strictly for local development / testing
   const mockUser: SupabaseUser = {
     id: `usr_${Date.now()}`,
     email: cleanEmail,
@@ -372,7 +381,16 @@ export async function signInWithEmail(
     }
   }
 
-  // Graceful local emulation
+  // In production builds, missing cloud credentials must fail safely
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      user: null,
+      session: null,
+      error: 'Cloud authentication service is not configured. Please ensure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are set.',
+    };
+  }
+
+  // Graceful local emulation strictly for local development / testing
   const mockUser: SupabaseUser = {
     id: `usr_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`,
     email: cleanEmail,

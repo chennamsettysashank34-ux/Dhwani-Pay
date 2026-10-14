@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS public.payment_events (
 
 CREATE INDEX IF NOT EXISTS idx_payments_merchant_id ON public.payment_events(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_payments_created_at ON public.payment_events(created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_merchant_utr ON public.payment_events(merchant_id, utr) WHERE utr IS NOT NULL AND utr <> '';
 
 -- ------------------------------------------------------------------------------
 -- TABLE: public.expenses

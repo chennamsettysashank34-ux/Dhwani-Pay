@@ -573,13 +573,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     amount: number,
     payerName?: string,
     source = 'UPI Payment',
-    utr?: string
+    utr?: string,
+    alreadyAnnouncedNatively = false
   ) => {
     const now = new Date();
     const time = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const date = now.toISOString().split('T')[0];
     const timestamp = now.getTime();
-    const state: EventState = announcementsEnabled ? 'Played' : 'Pending';
+    const state: EventState = (alreadyAnnouncedNatively || announcementsEnabled) ? 'Played' : 'Pending';
 
     const newEvent: PaymentEvent = {
       id: `pay-${Date.now()}`,
@@ -616,7 +617,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    if (announcementsEnabled) {
+    // Only speak via JS ExpoSpeech if it wasn't already spoken aloud by the native Android service
+    if (announcementsEnabled && !alreadyAnnouncedNatively) {
       speakPayment(amount, source, payerName);
     }
   };
@@ -716,7 +718,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           payment.amount,
           payment.payer || undefined,
           payment.source || 'UPI Soundbox',
-          payment.utr || undefined
+          payment.utr || undefined,
+          Boolean(payment.announcedNatively)
         );
       }
     });
@@ -742,7 +745,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!isMounted) return;
 
       try {
-        ws = new WebSocket(merchantProfile.gatewayUrl);
+        // Append merchant identification to WebSocket handshake for merchant isolation
+        let wsUrl = merchantProfile.gatewayUrl.trim();
+        const activeId = merchantCloudId || currentUser?.id || 'default_merchant';
+        if (wsUrl.includes('?')) {
+          wsUrl += `&merchantId=${encodeURIComponent(activeId)}`;
+        } else {
+          wsUrl += `?merchantId=${encodeURIComponent(activeId)}`;
+        }
+
+        ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           if (!isMounted) return;
@@ -754,12 +766,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           try {
             const data = JSON.parse(event.data);
             if (data.type === 'PAYMENT_RECEIVED' && data.amount) {
+              // Ensure payment event is destined for this merchant
+              if (data.merchantId && data.merchantId !== activeId && activeId !== 'default_merchant') {
+                return;
+              }
+
               if (recordRealPaymentRef.current) {
                 recordRealPaymentRef.current(
                   Number(data.amount),
                   data.payerName,
                   data.source || 'Payment Gateway',
-                  data.utr
+                  data.utr,
+                  false // WebSocket payments originate from backend and need voice announcement
                 );
               }
             }

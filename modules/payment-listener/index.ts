@@ -5,6 +5,7 @@ export interface NativePaymentEvent {
   source: string;
   payer: string;
   utr: string;
+  announcedNatively?: boolean;
 }
 
 type PaymentCallback = (event: NativePaymentEvent) => void;

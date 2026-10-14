@@ -25,6 +25,12 @@ jobs:
     - name: Install Dependencies
       run: npm install --legacy-peer-deps
 
+    - name: Run Verification Test Suite
+      run: npm test
+
+    - name: Generate Native Android Project (CNG)
+      run: npx expo prebuild --platform android --clean
+
     - name: Set up JDK 17
       uses: actions/setup-java@v5
       with:

@@ -67,11 +67,16 @@ export async function createRazorpayQr(
         expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       };
     } catch (err: any) {
-      console.warn('[Razorpay API] Live call failed, falling back to sandbox dynamic QR:', err.message);
+      console.warn('[Razorpay API] Live call failed:', err.message);
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`Razorpay gateway error: ${err.message}`);
+      }
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    throw new Error('Razorpay credentials (RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET) are not configured.');
   }
 
-  // Sandbox / Simulation Fallback (when developer hasn't configured live credentials yet)
+  // Sandbox / Simulation Fallback (strictly in non-production/development)
   const mockQrId = `qr_rzp_${Date.now().toString(36)}`;
   const mockUpiPayload = `upi://pay?pa=razorpay.merchant@icici&pn=DhwaniPay%20Store&am=${amount.toFixed(2)}&cu=INR&tr=${mockQrId}&tn=BillPayment`;
 
@@ -142,11 +147,16 @@ export async function createCashfreeQr(
         expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       };
     } catch (err: any) {
-      console.warn('[Cashfree API] Live call failed, falling back to sandbox dynamic QR:', err.message);
+      console.warn('[Cashfree API] Live call failed:', err.message);
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`Cashfree gateway error: ${err.message}`);
+      }
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    throw new Error('Cashfree credentials (CASHFREE_APP_ID & CASHFREE_SECRET_KEY) are not configured.');
   }
 
-  // Sandbox / Simulation Fallback
+  // Sandbox / Simulation Fallback (strictly in non-production/development)
   const mockOrderId = `cf_mock_${Date.now().toString(36)}`;
   const mockUpiPayload = `upi://pay?pa=cashfree.merchant@yesbank&pn=DhwaniPay%20Store&am=${amount.toFixed(2)}&cu=INR&tr=${mockOrderId}&tn=CounterPayment`;
 

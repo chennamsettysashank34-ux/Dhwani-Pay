@@ -7,10 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import java.util.Locale
@@ -18,21 +21,21 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.Pattern
 
 /**
- * Production-Grade Android NotificationListenerService for DhwaniPay
+ * Hardened Android NotificationListenerService for DhwaniPay Soundbox
  *
- * Intercepts incoming UPI payments from supported Indian merchant apps:
+ * Intercepts incoming UPI payment notifications from:
  * - Google Pay for Business & Consumer (com.google.android.apps.nbu.paisa.*)
  * - PhonePe for Business & Consumer (com.phonepe.app.*)
  * - Paytm for Business (net.one97.paytm)
  * - BHIM UPI (in.org.npci.upiapp)
  * - BharatPe (com.bharatpe.app)
- * - Verified Bank Transaction SMS
+ * - Verified Bank Transaction SMS (Default Android Messaging, Samsung Messages)
  *
- * Features:
- * - Native WakeLock acquisition (ensures playback when phone screen is locked/sleeping)
- * - Non-blocking regex extraction for Amount, Payer Name, and UTR Reference ID
- * - Sliding-window deduplication (prevents double announcements on notification update)
- * - Native TextToSpeech playback in Hindi and Indian English
+ * Core Guarantees:
+ * 1. Single Voice Owner: Native code speaks payment; sends announcedNatively=true to React Native.
+ * 2. UtteranceProgressListener: Keeps WakeLock held during actual speech playback, then cleanly releases.
+ * 3. Replay & Duplicate Prevention: Sliding 120-second window on (amount + payer + utr).
+ * 4. Negative Pattern Filtering: Rejects debits, failures, cashback promos, and payment requests.
  */
 class PaymentNotificationListenerService : NotificationListenerService(), TextToSpeech.OnInitListener {
 
@@ -41,7 +44,7 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
         private const val CHANNEL_ID = "dhwanipay_soundbox_service"
         private const val NOTIFICATION_ID = 8801
 
-        // Supported package names
+        // Supported Indian payment package names
         private val SUPPORTED_PACKAGES = setOf(
             "com.google.android.apps.nbu.paisa.merchant", // Google Pay for Business
             "com.google.android.apps.nbu.paisa.user",     // Google Pay
@@ -54,7 +57,7 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
             "com.samsung.android.messaging"               // Samsung SMS
         )
 
-        // Regex patterns for Indian UPI payment extraction
+        // Strict positive credit regex patterns
         private val AMOUNT_PATTERN = Pattern.compile(
             "(?i)(?:received|credited|received\\s+payment\\s+of|payment\\s+of)\\s*(?:rs\\.?|inr|₹)?\\s*([0-9,]+(?:\\.[0-9]{1,2})?)",
             Pattern.CASE_INSENSITIVE
@@ -72,6 +75,14 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
             Pattern.CASE_INSENSITIVE
         )
 
+        // Negative indicators (debits, failures, promos)
+        private val NEGATIVE_KEYWORDS = listOf(
+            "debited", "paid to", "sent to", "you paid", "withdrawn",
+            "payment sent", "failed", "declined", "unsuccessful", "reversed",
+            "reminder to", "requested", "request to pay", "collect request",
+            "cashback offer", "scratch card", "win up to", "reward", "coupon"
+        )
+
         // Deduplication cache: key -> timestamp (expires after 120 seconds)
         private val recentAnnouncements = ConcurrentHashMap<String, Long>()
     }
@@ -79,10 +90,12 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
     private var wakeLock: PowerManager.WakeLock? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var wakeLockTimeoutRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "DhwaniPay Notification Listener Service started")
+        Log.i(TAG, "DhwaniPay Notification Listener Service starting")
         try {
             tts = TextToSpeech(applicationContext, this)
 
@@ -95,7 +108,7 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
             createNotificationChannel()
             startForegroundServiceNotification()
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing PaymentNotificationListenerService", e)
+            Log.e(TAG, "Error in onCreate", e)
         }
     }
 
@@ -103,12 +116,35 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
         if (status == TextToSpeech.SUCCESS) {
             val result = tts?.setLanguage(Locale("en", "IN"))
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                // Fallback to default
                 tts?.setLanguage(Locale.US)
             }
             tts?.setSpeechRate(0.9f)
+
+            // Setup UtteranceProgressListener to manage WakeLock lifecycle accurately
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    Log.d(TAG, "TTS Utterance started: $utteranceId")
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    Log.d(TAG, "TTS Utterance completed: $utteranceId")
+                    releaseWakeLockSafely()
+                }
+
+                override fun onError(utteranceId: String?) {
+                    Log.w(TAG, "TTS Utterance failed: $utteranceId")
+                    releaseWakeLockSafely()
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    Log.w(TAG, "TTS Utterance failed with code $errorCode: $utteranceId")
+                    releaseWakeLockSafely()
+                }
+            })
+
             isTtsReady = true
-            Log.i(TAG, "Native TextToSpeech initialized successfully")
+            Log.i(TAG, "Native TextToSpeech initialized with UtteranceProgressListener")
         } else {
             Log.e(TAG, "Native TextToSpeech initialization failed with code: $status")
         }
@@ -120,7 +156,7 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
         val packageName = sbn.packageName ?: return
         if (!SUPPORTED_PACKAGES.contains(packageName)) return
 
-        val extras = sbn.notification.extras ?: return
+        val extras = sbn.notification?.extras ?: return
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
         val text = extras.getCharSequence("android.text")?.toString() ?: ""
         val bigText = extras.getCharSequence("android.bigText")?.toString() ?: ""
@@ -132,12 +168,22 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
     }
 
     private fun parseAndAnnounce(packageName: String, content: String) {
-        // Quick keyword check to ensure it's a credit event
         val lower = content.lowercase(Locale.ROOT)
-        val isCredit = lower.contains("received") || lower.contains("credited") || lower.contains("paid you")
+
+        // 1. Negative checks: reject debits, failures, requests, and marketing messages
+        for (keyword in NEGATIVE_KEYWORDS) {
+            if (lower.contains(keyword)) {
+                Log.d(TAG, "Notification rejected due to negative keyword '$keyword': $content")
+                return
+            }
+        }
+
+        // 2. Positive credit check
+        val isCredit = lower.contains("received") || lower.contains("credited") ||
+                lower.contains("paid you") || lower.contains("sent you")
         if (!isCredit) return
 
-        // 1. Extract Amount
+        // 3. Extract Amount
         var amount: Double? = null
         var matcher = AMOUNT_PATTERN.matcher(content)
         if (matcher.find()) {
@@ -149,23 +195,26 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
             }
         }
 
-        if (amount == null || amount <= 0) return
+        if (amount == null || amount <= 0 || amount > 1_000_000) {
+            Log.d(TAG, "Invalid amount extracted: $amount")
+            return
+        }
 
-        // 2. Extract Payer Name (Optional)
+        // 4. Extract Payer Name (Optional)
         var payer: String? = null
         val payerMatcher = PAYER_PATTERN.matcher(content)
         if (payerMatcher.find()) {
             payer = payerMatcher.group(1)?.trim()
         }
 
-        // 3. Extract UTR / Txn Reference (Optional)
+        // 5. Extract UTR / Txn Reference (Optional)
         var utr: String? = null
         val utrMatcher = UTR_PATTERN.matcher(content)
         if (utrMatcher.find()) {
             utr = utrMatcher.group(1)?.trim()
         }
 
-        // 4. Source App Identifier
+        // 6. Source App Identifier
         val sourceName = when (packageName) {
             "com.google.android.apps.nbu.paisa.merchant" -> "Google Pay for Business"
             "com.google.android.apps.nbu.paisa.user" -> "Google Pay"
@@ -177,7 +226,7 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
             else -> "Bank UPI"
         }
 
-        // 5. Deduplication check
+        // 7. Deduplication check (120-second window)
         val dedupeKey = "${amount}_${payer ?: "anon"}_${utr ?: content.hashCode()}"
         val now = System.currentTimeMillis()
         val lastSeen = recentAnnouncements[dedupeKey]
@@ -190,11 +239,11 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
         recentAnnouncements[dedupeKey] = now
         cleanupOldAnnouncements(now)
 
-        // 6. Speak payment aloud
-        speakPayment(amount, sourceName, payer)
+        // 8. Speak payment aloud natively (single voice owner)
+        speakPaymentNatively(amount, sourceName, payer)
 
-        // 7. Broadcast event to React Native UI
-        broadcastToReactNative(amount, sourceName, payer, utr)
+        // 9. Broadcast event to React Native UI with announcedNatively=true
+        broadcastToReactNative(amount, sourceName, payer, utr, announcedNatively = true)
     }
 
     private fun cleanAmount(raw: String?): Double? {
@@ -206,9 +255,9 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
         }
     }
 
-    private fun speakPayment(amount: Double, source: String, payer: String?) {
+    private fun speakPaymentNatively(amount: Double, source: String, payer: String?) {
         try {
-            wakeLock?.acquire(15000L) // Hold CPU wake lock for 15 seconds during audio output
+            acquireWakeLockWithTimeout(15000L) // 15s max safety ceiling
 
             val amountInt = if (amount % 1.0 == 0.0) amount.toInt().toString() else amount.toString()
             val speechText = if (!payer.isNullOrBlank()) {
@@ -217,27 +266,63 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
                 "Received $amountInt rupees on $source."
             }
 
-            Log.i(TAG, "Announcing: $speechText")
+            Log.i(TAG, "Announcing natively: $speechText")
 
             if (isTtsReady && tts != null) {
                 tts?.stop()
-                tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "dhwani_pay_${System.currentTimeMillis()}")
+                val utteranceId = "dhwani_${System.currentTimeMillis()}"
+                tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            } else {
+                Log.w(TAG, "TTS not ready for speech playback")
+                releaseWakeLockSafely()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error speaking payment", e)
-        } finally {
-            if (wakeLock?.isHeld == true) {
-                wakeLock?.release()
-            }
+            Log.e(TAG, "Error in speakPaymentNatively", e)
+            releaseWakeLockSafely()
         }
     }
 
-    private fun broadcastToReactNative(amount: Double, source: String, payer: String?, utr: String?) {
+    private fun acquireWakeLockWithTimeout(timeoutMs: Long) {
+        try {
+            if (wakeLock?.isHeld != true) {
+                wakeLock?.acquire(timeoutMs)
+            }
+            // Clear existing timeout
+            wakeLockTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+            // Schedule safety release
+            wakeLockTimeoutRunnable = Runnable { releaseWakeLockSafely() }
+            mainHandler.postDelayed(wakeLockTimeoutRunnable!!, timeoutMs)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not acquire WakeLock: ${e.message}")
+        }
+    }
+
+    private fun releaseWakeLockSafely() {
+        try {
+            wakeLockTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+            wakeLockTimeoutRunnable = null
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+                Log.d(TAG, "WakeLock safely released")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing WakeLock: ${e.message}")
+        }
+    }
+
+    private fun broadcastToReactNative(
+        amount: Double,
+        source: String,
+        payer: String?,
+        utr: String?,
+        announcedNatively: Boolean
+    ) {
         val intent = Intent("in.dhwanipay.app.PAYMENT_RECEIVED").apply {
             putExtra("amount", amount)
             putExtra("source", source)
             putExtra("payer", payer)
             putExtra("utr", utr)
+            putExtra("announcedNatively", announcedNatively)
             setPackage(packageName)
         }
         sendBroadcast(intent)
@@ -300,9 +385,7 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
         super.onDestroy()
         tts?.stop()
         tts?.shutdown()
-        if (wakeLock?.isHeld == true) {
-            wakeLock?.release()
-        }
+        releaseWakeLockSafely()
         Log.i(TAG, "DhwaniPay Notification Listener Service destroyed")
     }
 }

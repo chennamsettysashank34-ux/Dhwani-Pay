@@ -59,6 +59,7 @@ class PaymentListenerModule : Module() {
                     val source = intent.getStringExtra("source") ?: "UPI"
                     val payer = intent.getStringExtra("payer") ?: ""
                     val utr = intent.getStringExtra("utr") ?: ""
+                    val announcedNatively = intent.getBooleanExtra("announcedNatively", false)
 
                     if (amount <= 0) return
 
@@ -67,7 +68,8 @@ class PaymentListenerModule : Module() {
                             "amount" to amount,
                             "source" to source,
                             "payer" to payer,
-                            "utr" to utr
+                            "utr" to utr,
+                            "announcedNatively" to announcedNatively
                         )
                     )
                 }
