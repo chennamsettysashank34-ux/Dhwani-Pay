@@ -19,3 +19,4 @@ android/build/
 android/app/build/
 android/.gradle/
 powershell.cmd
+.aistudio/
