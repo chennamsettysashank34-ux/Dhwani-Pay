@@ -1,10 +1,11 @@
-package in.dhwanipay.app
+package `in`.dhwanipay.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
@@ -203,7 +204,7 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
 
     private fun speakPayment(amount: Double, source: String, payer: String?) {
         try {
-            wakeLock?.acquire(8000) // Hold CPU wake lock for 8 seconds during audio output
+            wakeLock?.acquire(15000L) // Hold CPU wake lock for 15 seconds during audio output
 
             val amountInt = if (amount % 1.0 == 0.0) amount.toInt().toString() else amount.toString()
             val speechText = if (!payer.isNullOrBlank()) {
@@ -280,7 +281,11 @@ class PaymentNotificationListenerService : NotificationListenerService(), TextTo
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     override fun onDestroy() {

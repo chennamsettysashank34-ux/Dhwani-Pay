@@ -56,6 +56,7 @@ module.exports = function withNotificationListener(config) {
           'android:label': 'DhwaniPay Soundbox Service',
           'android:permission': 'android.permission.BIND_NOTIFICATION_LISTENER_SERVICE',
           'android:exported': 'true',
+          'android:foregroundServiceType': 'mediaPlayback',
         },
         'intent-filter': [
           {
@@ -96,13 +97,28 @@ module.exports = function withNotificationListener(config) {
       );
       const serviceTarget = path.join(targetDir, 'PaymentNotificationListenerService.kt');
 
+      // Kotlin hard keywords cannot be used as plain package segments —
+      // they must be escaped with backticks (e.g. `in`.dhwanipay.app,
+      // matching Expo's own MainActivity/MainApplication templates).
+      const KOTLIN_HARD_KEYWORDS = new Set([
+        'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for',
+        'fun', 'if', 'in', 'interface', 'is', 'null', 'object', 'package',
+        'return', 'super', 'this', 'throw', 'true', 'try', 'typealias',
+        'typeof', 'val', 'var', 'when', 'while',
+      ]);
+      const escapeKotlinPackage = (pkg) =>
+        pkg
+          .split('.')
+          .map((seg) => (KOTLIN_HARD_KEYWORDS.has(seg) ? '`' + seg + '`' : seg))
+          .join('.');
+
       if (fs.existsSync(serviceSource)) {
         let sourceContent = fs.readFileSync(serviceSource, 'utf8');
 
         // Ensure the package declaration matches the app's package name
         sourceContent = sourceContent.replace(
           /^package\s+\S+/m,
-          `package ${packageName}`
+          `package ${escapeKotlinPackage(packageName)}`
         );
 
         fs.writeFileSync(serviceTarget, sourceContent, 'utf8');

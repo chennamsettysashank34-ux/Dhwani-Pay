@@ -5,11 +5,11 @@ def safeExtGet(String prop, Integer fallback) {
 apply plugin: 'com.android.library'
 apply plugin: 'org.jetbrains.kotlin.android'
 
-group = 'in.dhwanipay.app.modules'
+group = 'com.dhwanipay.paymentlistener'
 version = '1.0.0'
 
 android {
-    namespace "in.dhwanipay.app.modules"
+    namespace "com.dhwanipay.paymentlistener"
     compileSdk safeExtGet("compileSdkVersion", 35)
 
     defaultConfig {

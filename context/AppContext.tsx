@@ -166,7 +166,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [demoMode, setDemoMode] = useState(false);
   const [announcementsEnabled, setAnnouncementsEnabled] = useState(true);
   const [permissionState, setPermissionState] = useState<PermissionState>('enabled');
-  const [spokenLanguage, setSpokenLanguage] = useState('English');
+  const [spokenLanguage, _setSpokenLanguage] = useState('English');
   const [interfaceLanguage, setInterfaceLanguage] = useState('English');
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [merchantProfile, setMerchantProfile] = useState<MerchantProfile>(defaultMerchantProfile);
@@ -178,6 +178,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const isDark = themeMode === 'dark' || (themeMode === 'system' && scheme === 'dark');
   const colors = isDark ? darkPalette : lightPalette;
   const isCloudActive = isRealSupabaseConfigured();
+
+  const setSpokenLanguage = (lang: string) => {
+    _setSpokenLanguage(lang);
+    storage.setItem(LANG_STORAGE_KEY, lang);
+  };
 
   // Load persisted configuration, active Supabase session & local records on mount
   useEffect(() => {
@@ -227,7 +232,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // 2. Spoken language
         const savedLang = await storage.getItem(LANG_STORAGE_KEY);
         if (savedLang) {
-          setSpokenLanguage(savedLang);
+          _setSpokenLanguage(savedLang);
         }
 
         // 3. Vault QRs - purge legacy demo standees

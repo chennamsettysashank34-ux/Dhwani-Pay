@@ -1,4 +1,4 @@
-package in.dhwanipay.app.modules
+package com.dhwanipay.paymentlistener
 
 import android.content.BroadcastReceiver
 import android.content.Context
