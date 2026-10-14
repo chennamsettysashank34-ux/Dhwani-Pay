@@ -33,6 +33,7 @@ import { useApp } from '@/context/AppContext';
 import { BrandMark, Button, Card, Header, InfoBanner, Screen, StatusPill } from '@/components/ui';
 import { confirmAction } from '@/utils/confirm';
 import {
+  registerOfflineMerchant,
   signInWithEmail,
   signUpWithEmail,
 } from '@/lib/supabase';
@@ -62,6 +63,29 @@ export default function AuthScreen() {
       } catch {
         router.navigate('/(tabs)');
       }
+    }
+  };
+
+  const handleOfflineContinue = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const effectiveEmail = email.trim().toLowerCase() || 'merchant@dhwanipay.local';
+      const effectiveBusinessName = businessName.trim() || 'Mani Sai Xerox';
+      const effectiveVpa = vpa.trim() || `${effectiveEmail.split('@')[0]}@upi`;
+
+      const { user } = await registerOfflineMerchant(effectiveEmail, {
+        businessName: effectiveBusinessName,
+        vpa: effectiveVpa,
+        spokenLanguage,
+      });
+
+      loginUser(user);
+      navigateToDashboard();
+    } catch (e: any) {
+      setErrorMsg(e.message || 'Could not start standalone soundbox mode.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -451,11 +475,19 @@ export default function AuthScreen() {
                 </Text>
               </View>
             ) : (
-              <Button
-                title={mode === 'signin' ? 'Sign In to Soundbox' : 'Register & Start Soundbox'}
-                icon={mode === 'signin' ? LogIn : UserPlus}
-                onPress={handleAuthSubmit}
-              />
+              <View style={{ gap: 10 }}>
+                <Button
+                  title={mode === 'signin' ? 'Sign In to Soundbox' : 'Register & Start Soundbox'}
+                  icon={mode === 'signin' ? LogIn : UserPlus}
+                  onPress={handleAuthSubmit}
+                />
+                <Button
+                  title="Continue in Standalone Soundbox Mode"
+                  variant="secondary"
+                  icon={Store}
+                  onPress={handleOfflineContinue}
+                />
+              </View>
             )}
           </View>
         </>

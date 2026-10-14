@@ -270,6 +270,20 @@ export async function signUpWithEmail(
       await setStoredSession(session);
       return { user, session, error: undefined };
     } catch (err: any) {
+      const isNetError =
+        err.message?.includes('SocketException') ||
+        err.message?.includes('Connection reset') ||
+        err.message?.includes('fetch failed') ||
+        err.message?.includes('Network request failed');
+
+      if (isNetError) {
+        return {
+          user: null,
+          session: null,
+          error:
+            'Connection reset by your WiFi/ISP network. Switch to Mobile Data or Private DNS (dns.google), or tap "Continue in Offline Mode" below.',
+        };
+      }
       return {
         user: null,
         session: null,
@@ -307,6 +321,36 @@ export async function signUpWithEmail(
 
   await setStoredSession(mockSession);
   return { user: mockUser, session: mockSession, error: undefined };
+}
+
+/**
+ * Register or login a merchant in standalone offline mode.
+ * Operates entirely on-device without cloud dependency, guaranteeing full soundbox functionality.
+ */
+export async function registerOfflineMerchant(
+  email: string,
+  metadata: { businessName: string; vpa: string; spokenLanguage?: string }
+): Promise<{ user: SupabaseUser; session: SupabaseSession }> {
+  const cleanEmail = email.trim().toLowerCase() || 'merchant@dhwanipay.local';
+  const offlineUser: SupabaseUser = {
+    id: `usr_${Date.now()}`,
+    email: cleanEmail,
+    user_metadata: {
+      business_name: metadata.businessName || 'My Store',
+      vpa: metadata.vpa || `${cleanEmail.split('@')[0]}@upi`,
+      spoken_language: metadata.spokenLanguage || 'English',
+    },
+  };
+
+  const offlineSession: SupabaseSession = {
+    access_token: `offline_jwt_${Date.now()}`,
+    refresh_token: `offline_refresh_${Date.now()}`,
+    expires_at: Date.now() + 3600000 * 24 * 365,
+    user: offlineUser,
+  };
+
+  await setStoredSession(offlineSession);
+  return { user: offlineUser, session: offlineSession };
 }
 
 /**
@@ -373,6 +417,20 @@ export async function signInWithEmail(
       await setStoredSession(session);
       return { user, session, error: undefined };
     } catch (err: any) {
+      const isNetError =
+        err.message?.includes('SocketException') ||
+        err.message?.includes('Connection reset') ||
+        err.message?.includes('fetch failed') ||
+        err.message?.includes('Network request failed');
+
+      if (isNetError) {
+        return {
+          user: null,
+          session: null,
+          error:
+            'Connection reset by your WiFi/ISP network. Switch to Mobile Data or Private DNS (dns.google), or tap "Continue in Offline Mode" below.',
+        };
+      }
       return {
         user: null,
         session: null,
